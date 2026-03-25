@@ -2,9 +2,13 @@ const vscode = require('vscode');
 const path = require('path');
 const { validateFlowFile } = require('./flowDetection');
 const { extractParameters, promptForParameters } = require('./parameterPrompt');
-const { buildRunCommand, quoteForTerminal } = require('./buildRunCommand');
+const { buildRunCommand, quoteForTerminal, detectShellType } = require('./buildRunCommand');
 
 let sharedTerminal = null;
+
+function getShellType() {
+  return detectShellType(vscode.env.shell);
+}
 
 function getOrCreateTerminal() {
   if (!sharedTerminal || sharedTerminal.exitStatus !== undefined) {
@@ -14,9 +18,10 @@ function getOrCreateTerminal() {
 }
 
 function sendToTerminal(fileDir, command) {
+  const shell = getShellType();
   const terminal = getOrCreateTerminal();
   terminal.show();
-  terminal.sendText(`cd ${quoteForTerminal(fileDir)}`);
+  terminal.sendText(`cd ${quoteForTerminal(fileDir, shell)}`);
   terminal.sendText(command);
 }
 
@@ -35,17 +40,18 @@ function findEnclosingFunction(doc, line) {
 async function runFlow(doc) {
   const filePath = doc.fileName;
   const fileDir = path.dirname(filePath);
+  const shell = getShellType();
 
   const params = await extractParameters(filePath);
   let flagArgs = [];
 
   if (params.length > 0) {
     const values = await promptForParameters(params);
-    if (values === null) return; // user cancelled
+    if (values === null) return;
     flagArgs = values;
   }
 
-  const command = buildRunCommand(filePath, flagArgs);
+  const command = buildRunCommand(filePath, flagArgs, shell);
   sendToTerminal(fileDir, command);
 }
 
@@ -58,7 +64,8 @@ async function spinStep(doc, editor) {
 
   const filePath = doc.fileName;
   const fileDir = path.dirname(filePath);
-  const command = `python ${quoteForTerminal(filePath)} spin ${funcName}`;
+  const shell = getShellType();
+  const command = `python ${quoteForTerminal(filePath, shell)} spin ${funcName}`;
   sendToTerminal(fileDir, command);
 }
 
