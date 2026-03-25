@@ -1,5 +1,6 @@
 const vscode = require('vscode');
 const path = require('path');
+const { validateFlowFile } = require('./flowDetection');
 
 let sharedTerminal = null;
 
@@ -8,9 +9,9 @@ let sharedTerminal = null;
  */
 async function runPythonCommand(scriptName) {
   const editor = vscode.window.activeTextEditor;
-  if (!editor) return;
+  const doc = validateFlowFile(editor);
+  if (!doc) return;
 
-  const doc = editor.document;
   await doc.save();
 
   const cursorLine = editor.selection.active.line;
