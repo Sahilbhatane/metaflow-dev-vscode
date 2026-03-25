@@ -9,10 +9,36 @@ This lightweight VS Code extension supercharges your Metaflow dev workflow:
 
 The extension automatically:
 
+* Validates that the active file contains a Metaflow `FlowSpec` class before running
+* Detects `Parameter(...)` definitions and prompts you for values before execution
+* Pre-fills default values and validates input types (int, float, bool, JSON)
 * Detects the current function name (`def` or `async def`)
 * Saves the file before running
 * Executes the command in the file’s directory
 * Reuses a shared terminal session
+
+## Smart Parameter Prompts
+
+When you run a flow (Ctrl + Alt + R), the extension parses your Python file for `Parameter(...)` definitions and shows an input prompt for each one. Default values are pre-filled, required parameters are enforced, and type validation is applied automatically.
+
+The final command is built as `python flow.py run --param1=value1 --param2=value2` and sent to the terminal.
+
+### Current Limitations
+
+* Parameter detection uses static AST parsing — it does not import or execute your code.
+* Dynamic parameters (created in loops or conditionals), renamed imports (e.g. `P = Parameter`), and deploy-time callable defaults are not detected.
+* `IncludeFile` parameters are not yet supported.
+* The extension uses `python` as the interpreter; custom virtualenv paths are not yet supported (see [#3](https://github.com/outerbounds/metaflow-dev-vscode/issues/3)).
+
+You can always fall back to running flows manually via the terminal if the prompt does not detect your parameters.
+
+## Running Tests
+
+```bash
+npm test
+```
+
+This runs all tests using Node's built-in test runner. Tests cover flow detection, parameter extraction, and command construction.
 
 ##  Installation
 
