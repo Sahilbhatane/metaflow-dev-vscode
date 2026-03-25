@@ -1,12 +1,67 @@
 const vscode = require('vscode');
 const path = require('path');
 const { validateFlowFile } = require('./flowDetection');
+const { extractParameters, promptForParameters } = require('./parameterPrompt');
+const { buildRunCommand, quoteForTerminal } = require('./buildRunCommand');
 
 let sharedTerminal = null;
 
+function getOrCreateTerminal() {
+  if (!sharedTerminal || sharedTerminal.exitStatus !== undefined) {
+    sharedTerminal = vscode.window.createTerminal('Metaflow Runner');
+  }
+  return sharedTerminal;
+}
+
+function sendToTerminal(fileDir, command) {
+  const terminal = getOrCreateTerminal();
+  terminal.show();
+  terminal.sendText(`cd ${quoteForTerminal(fileDir)}`);
+  terminal.sendText(command);
+}
+
 /**
- * Core function to detect the current Python function name and run a script.
+ * Find the nearest enclosing Python function name above the cursor.
  */
+function findEnclosingFunction(doc, line) {
+  for (let i = line; i >= 0; i--) {
+    const lineText = doc.lineAt(i).text.trim();
+    const match = lineText.match(/^(?:async\s+def|def)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+async function runFlow(doc) {
+  const filePath = doc.fileName;
+  const fileDir = path.dirname(filePath);
+
+  const params = await extractParameters(filePath);
+  let flagArgs = [];
+
+  if (params.length > 0) {
+    const values = await promptForParameters(params);
+    if (values === null) return; // user cancelled
+    flagArgs = values;
+  }
+
+  const command = buildRunCommand(filePath, flagArgs);
+  sendToTerminal(fileDir, command);
+}
+
+async function spinStep(doc, editor) {
+  const funcName = findEnclosingFunction(doc, editor.selection.active.line);
+  if (!funcName) {
+    vscode.window.showErrorMessage('No enclosing Python function found.');
+    return;
+  }
+
+  const filePath = doc.fileName;
+  const fileDir = path.dirname(filePath);
+  const command = `python ${quoteForTerminal(filePath)} spin ${funcName}`;
+  sendToTerminal(fileDir, command);
+}
+
 async function runPythonCommand(scriptName) {
   const editor = vscode.window.activeTextEditor;
   const doc = validateFlowFile(editor);
@@ -14,47 +69,11 @@ async function runPythonCommand(scriptName) {
 
   await doc.save();
 
-  const cursorLine = editor.selection.active.line;
-
-  // Find the nearest "def"/"async def" above cursor
-  let funcName = null;
-  for (let i = cursorLine; i >= 0; i--) {
-    const lineText = doc.lineAt(i).text.trim();
-    const match = lineText.match(/^(?:async\s+def|def)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/);
-    if (match) {
-      funcName = match[1];
-      break;
-    }
+  if (scriptName === 'spin_func') {
+    await spinStep(doc, editor);
+  } else {
+    await runFlow(doc);
   }
-
-  if (!funcName) {
-    vscode.window.showErrorMessage("No enclosing Python function found.");
-    return;
-  }
-
-  const filePath = doc.fileName;
-  const fileDir = path.dirname(filePath);
-
-  let command = '';
-  if (scriptName == 'spin_func')
-    command = `python ${filePath} spin ${funcName}`;
-  else
-    command = `python ${filePath} run`;
-
-  // Reuse or create a single shared terminal
-  if (!sharedTerminal || sharedTerminal.exitStatus !== undefined) {
-    sharedTerminal = vscode.window.createTerminal('Metaflow Runner');
-  }
-
-  sharedTerminal.show();
-  sharedTerminal.sendText(`cd "${fileDir}"`);
-  sharedTerminal.sendText(command);
-
-  /*
-  vscode.window.showInformationMessage(
-    `${scriptName.toUpperCase()}: ${funcName} from ${path.basename(filePath)}`
-  );
-  */
 }
 
 function activate(context) {
