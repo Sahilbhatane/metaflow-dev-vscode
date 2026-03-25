@@ -13,6 +13,9 @@
     "url": "https://github.com/outerbounds/metaflow-dev-vscode"
   },
   "main": "./extension.js",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
   "contributes": {
     "commands": [
       {

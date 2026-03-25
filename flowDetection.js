@@ -1,5 +1,3 @@
-const vscode = require('vscode');
-
 const FLOWSPEC_CLASS_RE = /^class\s+\w+\s*\(.*\bFlowSpec\b.*\)\s*:/m;
 
 /**
@@ -15,6 +13,8 @@ function isFlowSpecFile(text) {
  * Returns the TextDocument on success.
  */
 function validateFlowFile(editor) {
+  const vscode = require('vscode');
+
   if (!editor) {
     vscode.window.showErrorMessage('No active editor.');
     return null;
