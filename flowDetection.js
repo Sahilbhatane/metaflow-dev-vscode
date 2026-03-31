@@ -29,7 +29,8 @@ function validateEditorForFlowCommands(editor) {
 }
 
 /**
- * Shows errors when inspect result blocks run/spin. Returns false if blocked.
+ * Shows errors when inspect result blocks run/spin.
+ * @returns {boolean} true if run/spin should abort (failure reported), false if OK to continue.
  * @param {{ syntaxOk: boolean, hasFlowSpec: boolean, error?: string | null }} inspectResult
  */
 function reportFlowInspectFailure(inspectResult) {

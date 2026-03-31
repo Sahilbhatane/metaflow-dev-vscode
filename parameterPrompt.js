@@ -1,44 +1,52 @@
 const vscode = require('vscode');
-const { execFile } = require('child_process');
 const path = require('path');
+const { execFilePythonChain } = require('./pythonRunner');
 
 const INSPECT_SCRIPT = path.join(__dirname, 'scripts', 'inspectFlowFile.py');
 
+function parseInspectStdout(stdout) {
+  try {
+    const parsed = JSON.parse(stdout);
+    return {
+      syntaxOk: !!parsed.syntaxOk,
+      hasFlowSpec: !!parsed.hasFlowSpec,
+      parameters: Array.isArray(parsed.parameters) ? parsed.parameters : [],
+      error: parsed.error != null ? parsed.error : null,
+    };
+  } catch (parseErr) {
+    console.error('Failed to parse inspect output:', parseErr.message);
+    return {
+      syntaxOk: false,
+      hasFlowSpec: false,
+      parameters: [],
+      error: 'Invalid inspect output.',
+    };
+  }
+}
+
 /**
  * Run inspectFlowFile.py and return { syntaxOk, hasFlowSpec, parameters, error }.
- * On spawn/parse failure, returns a failed result object (never throws).
+ * Tries `python` then `python3` when PYTHON is unset. On failure, returns a result object (never throws).
  */
 function inspectFlowFile(filePath) {
   return new Promise((resolve) => {
-    execFile('python', [INSPECT_SCRIPT, filePath], { timeout: 10000 }, (err, stdout, stderr) => {
-      if (err) {
-        console.error('inspectFlowFile failed:', stderr || err.message);
-        resolve({
-          syntaxOk: false,
-          hasFlowSpec: false,
-          parameters: [],
-          error: (stderr && String(stderr).trim()) || err.message || 'Failed to inspect flow file.',
-        });
-        return;
+    execFilePythonChain(
+      [INSPECT_SCRIPT, filePath],
+      { timeout: 10000 },
+      (err, stdout, stderr) => {
+        if (err) {
+          console.error('inspectFlowFile failed:', stderr || err.message);
+          resolve({
+            syntaxOk: false,
+            hasFlowSpec: false,
+            parameters: [],
+            error: (stderr && String(stderr).trim()) || err.message || 'Failed to inspect flow file.',
+          });
+          return;
+        }
+        resolve(parseInspectStdout(stdout));
       }
-      try {
-        const parsed = JSON.parse(stdout);
-        resolve({
-          syntaxOk: !!parsed.syntaxOk,
-          hasFlowSpec: !!parsed.hasFlowSpec,
-          parameters: Array.isArray(parsed.parameters) ? parsed.parameters : [],
-          error: parsed.error != null ? parsed.error : null,
-        });
-      } catch (parseErr) {
-        console.error('Failed to parse inspect output:', parseErr.message);
-        resolve({
-          syntaxOk: false,
-          hasFlowSpec: false,
-          parameters: [],
-          error: 'Invalid inspect output.',
-        });
-      }
-    });
+    );
   });
 }
 
@@ -99,9 +107,8 @@ async function promptForParameters(params) {
       return null;
     }
 
-    if (value.trim()) {
-      results.push({ name: param.name, value: value.trim() });
-    }
+    // Preserve user input (including empty string and intentional spaces) for CLI flags.
+    results.push({ name: param.name, value });
   }
 
   return results;

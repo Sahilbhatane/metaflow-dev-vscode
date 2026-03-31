@@ -93,8 +93,13 @@ describe('CLI_NAME_RE', () => {
   it('rejects invalid names', () => {
     assert.ok(!CLI_NAME_RE.test(''));
     assert.ok(!CLI_NAME_RE.test('123abc'));
-    assert.ok(!CLI_NAME_RE.test('my-param'));
     assert.ok(!CLI_NAME_RE.test('my param'));
+    assert.ok(!CLI_NAME_RE.test('a=b'));
+  });
+
+  it('accepts hyphenated Click-style names', () => {
+    assert.ok(CLI_NAME_RE.test('my-param'));
+    assert.ok(CLI_NAME_RE.test('foo-bar_baz'));
   });
 });
 
@@ -126,9 +131,14 @@ describe('buildRunCommand', () => {
     assert.equal(cmd, "python '/flow.py' run --model='my model'");
   });
 
+  it('accepts hyphenated parameter names in command', () => {
+    const cmd = buildRunCommand('/flow.py', [{ name: 'my-flag', value: '1' }], 'bash');
+    assert.equal(cmd, "python '/flow.py' run --my-flag='1'");
+  });
+
   it('throws on invalid parameter names', () => {
     assert.throws(
-      () => buildRunCommand('/flow.py', [{ name: 'bad-name', value: '1' }], 'bash'),
+      () => buildRunCommand('/flow.py', [{ name: 'bad=name', value: '1' }], 'bash'),
       /Invalid parameter name/
     );
   });

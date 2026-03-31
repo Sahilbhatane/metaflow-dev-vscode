@@ -1,13 +1,13 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { execFileSync } = require('child_process');
 const path = require('path');
+const { execFilePythonSync } = require('../pythonRunner');
 
 const SCRIPT = path.join(__dirname, '..', 'scripts', 'extractFlowParameters.py');
 const FIXTURES = path.join(__dirname, '..', 'test_fixtures');
 
 function runExtractor(fixture) {
-  const stdout = execFileSync('python', [SCRIPT, path.join(FIXTURES, fixture)], {
+  const stdout = execFilePythonSync([SCRIPT, path.join(FIXTURES, fixture)], {
     encoding: 'utf-8',
   });
   return JSON.parse(stdout);
@@ -47,5 +47,15 @@ describe('extractFlowParameters.py', () => {
   it('returns empty array for flow without parameters', () => {
     const params = runExtractor('no_params_flow.py');
     assert.deepEqual(params, []);
+  });
+
+  it('extracts Parameter from annotated assignment', () => {
+    const params = runExtractor('ann_assign_flow.py');
+    assert.equal(params.length, 1);
+    const epochs = params[0];
+    assert.equal(epochs.name, 'epochs');
+    assert.equal(epochs.attribute, 'epochs');
+    assert.equal(epochs.default, 5);
+    assert.equal(epochs.type, 'int');
   });
 });

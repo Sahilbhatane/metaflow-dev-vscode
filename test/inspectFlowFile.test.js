@@ -1,13 +1,13 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { execFileSync } = require('child_process');
 const path = require('path');
+const { execFilePythonSync } = require('../pythonRunner');
 
 const SCRIPT = path.join(__dirname, '..', 'scripts', 'inspectFlowFile.py');
 const FIXTURES = path.join(__dirname, '..', 'test_fixtures');
 
 function inspectFixture(name) {
-  const stdout = execFileSync('python', [SCRIPT, path.join(FIXTURES, name)], {
+  const stdout = execFilePythonSync([SCRIPT, path.join(FIXTURES, name)], {
     encoding: 'utf-8',
   });
   return JSON.parse(stdout);
@@ -38,7 +38,7 @@ describe('inspectFlowFile.py', () => {
 
   it('matches extractParameters list for sample_flow', () => {
     const extractScript = path.join(__dirname, '..', 'scripts', 'extractFlowParameters.py');
-    const extractOut = execFileSync('python', [extractScript, path.join(FIXTURES, 'sample_flow.py')], {
+    const extractOut = execFilePythonSync([extractScript, path.join(FIXTURES, 'sample_flow.py')], {
       encoding: 'utf-8',
     });
     const paramsExtract = JSON.parse(extractOut);

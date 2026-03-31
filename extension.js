@@ -55,8 +55,15 @@ async function runFlow(doc, inspectResult) {
     flagArgs = values;
   }
 
-  const command = buildRunCommand(filePath, flagArgs, shell);
-  sendToTerminal(fileDir, command);
+  try {
+    const command = buildRunCommand(filePath, flagArgs, shell);
+    sendToTerminal(fileDir, command);
+  } catch (err) {
+    console.error('Failed to build or run Metaflow command:', err);
+    vscode.window.showErrorMessage(
+      err instanceof Error ? err.message : 'Failed to run Metaflow flow.'
+    );
+  }
 }
 
 async function spinStep(doc, editor) {

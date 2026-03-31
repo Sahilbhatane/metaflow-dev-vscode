@@ -5,7 +5,7 @@ AST-only helpers for Metaflow flow files. Never imports or executes user code.
 from __future__ import annotations
 
 import ast
-from typing import Any, Optional
+from typing import Any, Optional, Tuple
 
 
 def _get_call_name(node: ast.AST) -> Optional[str]:
@@ -87,6 +87,30 @@ def _extract_parameter(call_node: ast.Call, attribute_name: str) -> dict[str, An
     return param
 
 
+def _parameter_from_class_body_item(item: ast.stmt) -> Optional[Tuple[ast.Call, str]]:
+    """
+    Match `x = Parameter(...)` or annotated `x: T = Parameter(...)`.
+    Returns (call_node, attribute_name) or None.
+    """
+    if isinstance(item, ast.Assign):
+        if len(item.targets) != 1 or not isinstance(item.targets[0], ast.Name):
+            return None
+        if not isinstance(item.value, ast.Call):
+            return None
+        if _get_call_name(item.value.func) != 'Parameter':
+            return None
+        return (item.value, item.targets[0].id)
+    if isinstance(item, ast.AnnAssign):
+        if not isinstance(item.target, ast.Name):
+            return None
+        if not isinstance(item.value, ast.Call):
+            return None
+        if _get_call_name(item.value.func) != 'Parameter':
+            return None
+        return (item.value, item.target.id)
+    return None
+
+
 def extract_parameters_from_tree(tree: ast.AST) -> list[dict[str, Any]]:
     """Collect Parameter(...) definitions from FlowSpec subclasses in a parsed tree."""
     parameters: list[dict[str, Any]] = []
@@ -98,17 +122,11 @@ def extract_parameters_from_tree(tree: ast.AST) -> list[dict[str, Any]]:
             continue
 
         for item in node.body:
-            if not isinstance(item, ast.Assign):
+            got = _parameter_from_class_body_item(item)
+            if got is None:
                 continue
-            if len(item.targets) != 1 or not isinstance(item.targets[0], ast.Name):
-                continue
-            if not isinstance(item.value, ast.Call):
-                continue
-            if _get_call_name(item.value.func) != 'Parameter':
-                continue
-
-            attr_name = item.targets[0].id
-            parameters.append(_extract_parameter(item.value, attr_name))
+            call_node, attr_name = got
+            parameters.append(_extract_parameter(call_node, attr_name))
 
     return parameters
 

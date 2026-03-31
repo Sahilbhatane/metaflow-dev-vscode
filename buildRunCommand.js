@@ -1,4 +1,5 @@
-const CLI_NAME_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+/** Metaflow/Click long-option style: letters, digits, underscore, hyphen (not whitespace or '='). */
+const CLI_NAME_RE = /^[a-zA-Z_][a-zA-Z0-9_-]*$/;
 
 /**
  * Single-quote for bash/zsh: prevents all expansion.
