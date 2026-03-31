@@ -1,7 +1,7 @@
 const vscode = require('vscode');
 const path = require('path');
-const { validateFlowFile } = require('./flowDetection');
-const { extractParameters, promptForParameters } = require('./parameterPrompt');
+const { validateEditorForFlowCommands, reportFlowInspectFailure } = require('./flowDetection');
+const { inspectFlowFile, promptForParameters } = require('./parameterPrompt');
 const { buildRunCommand, quoteForTerminal, detectShellType } = require('./buildRunCommand');
 
 let sharedTerminal = null;
@@ -37,12 +37,16 @@ function findEnclosingFunction(doc, line) {
   return null;
 }
 
-async function runFlow(doc) {
+/**
+ * @param {import('vscode').TextDocument} doc
+ * @param {{ parameters: Array<Record<string, unknown>> }} inspectResult
+ */
+async function runFlow(doc, inspectResult) {
   const filePath = doc.fileName;
   const fileDir = path.dirname(filePath);
   const shell = getShellType();
 
-  const params = await extractParameters(filePath);
+  const params = inspectResult.parameters || [];
   let flagArgs = [];
 
   if (params.length > 0) {
@@ -71,15 +75,18 @@ async function spinStep(doc, editor) {
 
 async function runPythonCommand(scriptName) {
   const editor = vscode.window.activeTextEditor;
-  const doc = validateFlowFile(editor);
+  const doc = validateEditorForFlowCommands(editor);
   if (!doc) return;
 
   await doc.save();
 
+  const inspect = await inspectFlowFile(doc.fileName);
+  if (reportFlowInspectFailure(inspect)) return;
+
   if (scriptName === 'spin_func') {
     await spinStep(doc, editor);
   } else {
-    await runFlow(doc);
+    await runFlow(doc, inspect);
   }
 }
 

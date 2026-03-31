@@ -2,28 +2,52 @@ const vscode = require('vscode');
 const { execFile } = require('child_process');
 const path = require('path');
 
-const EXTRACTOR_SCRIPT = path.join(__dirname, 'scripts', 'extractFlowParameters.py');
+const INSPECT_SCRIPT = path.join(__dirname, 'scripts', 'inspectFlowFile.py');
 
 /**
- * Spawn the Python AST extractor and return parsed parameter definitions.
- * Returns an empty array on failure (logged to output channel).
+ * Run inspectFlowFile.py and return { syntaxOk, hasFlowSpec, parameters, error }.
+ * On spawn/parse failure, returns a failed result object (never throws).
  */
-function extractParameters(filePath) {
+function inspectFlowFile(filePath) {
   return new Promise((resolve) => {
-    execFile('python', [EXTRACTOR_SCRIPT, filePath], { timeout: 10000 }, (err, stdout, stderr) => {
+    execFile('python', [INSPECT_SCRIPT, filePath], { timeout: 10000 }, (err, stdout, stderr) => {
       if (err) {
-        console.error('Parameter extraction failed:', stderr || err.message);
-        resolve([]);
+        console.error('inspectFlowFile failed:', stderr || err.message);
+        resolve({
+          syntaxOk: false,
+          hasFlowSpec: false,
+          parameters: [],
+          error: (stderr && String(stderr).trim()) || err.message || 'Failed to inspect flow file.',
+        });
         return;
       }
       try {
-        resolve(JSON.parse(stdout));
+        const parsed = JSON.parse(stdout);
+        resolve({
+          syntaxOk: !!parsed.syntaxOk,
+          hasFlowSpec: !!parsed.hasFlowSpec,
+          parameters: Array.isArray(parsed.parameters) ? parsed.parameters : [],
+          error: parsed.error != null ? parsed.error : null,
+        });
       } catch (parseErr) {
-        console.error('Failed to parse extractor output:', parseErr.message);
-        resolve([]);
+        console.error('Failed to parse inspect output:', parseErr.message);
+        resolve({
+          syntaxOk: false,
+          hasFlowSpec: false,
+          parameters: [],
+          error: 'Invalid inspect output.',
+        });
       }
     });
   });
+}
+
+/**
+ * Spawn the Python AST extractor and return parsed parameter definitions.
+ * Returns an empty array on failure (logged).
+ */
+function extractParameters(filePath) {
+  return inspectFlowFile(filePath).then((inspect) => inspect.parameters);
 }
 
 /**
@@ -83,4 +107,9 @@ async function promptForParameters(params) {
   return results;
 }
 
-module.exports = { extractParameters, promptForParameters, validateInput };
+module.exports = {
+  inspectFlowFile,
+  extractParameters,
+  promptForParameters,
+  validateInput,
+};

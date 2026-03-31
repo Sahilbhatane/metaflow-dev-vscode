@@ -1,18 +1,17 @@
-const FLOWSPEC_CLASS_RE = /^class\s+\w+\s*\(.*\bFlowSpec\b.*\)\s*:/m;
-
 /**
- * Returns true if the given document text defines a Metaflow FlowSpec class.
+ * Pure predicate: whether AST inspection allows run/spin.
+ * @param {{ syntaxOk: boolean, hasFlowSpec: boolean }} inspectResult
  */
-function isFlowSpecFile(text) {
-  return FLOWSPEC_CLASS_RE.test(text);
+function flowInspectAllowsRun(inspectResult) {
+  return !!(inspectResult && inspectResult.syntaxOk && inspectResult.hasFlowSpec);
 }
 
 /**
- * Validates the active editor document is a Python file containing a FlowSpec.
+ * Validates the active editor: must exist and be a Python document.
  * Shows an error message and returns null when validation fails.
- * Returns the TextDocument on success.
+ * @returns {import('vscode').TextDocument | null}
  */
-function validateFlowFile(editor) {
+function validateEditorForFlowCommands(editor) {
   const vscode = require('vscode');
 
   if (!editor) {
@@ -26,14 +25,39 @@ function validateFlowFile(editor) {
     return null;
   }
 
-  if (!isFlowSpecFile(doc.getText())) {
-    vscode.window.showErrorMessage(
-      'No FlowSpec class found. This file does not appear to be a Metaflow flow.'
-    );
-    return null;
-  }
-
   return doc;
 }
 
-module.exports = { isFlowSpecFile, validateFlowFile };
+/**
+ * Shows errors when inspect result blocks run/spin. Returns false if blocked.
+ * @param {{ syntaxOk: boolean, hasFlowSpec: boolean, error?: string | null }} inspectResult
+ */
+function reportFlowInspectFailure(inspectResult) {
+  const vscode = require('vscode');
+
+  if (flowInspectAllowsRun(inspectResult)) {
+    return false;
+  }
+
+  if (!inspectResult.syntaxOk) {
+    vscode.window.showErrorMessage(
+      inspectResult.error || 'This file has a Python syntax error.'
+    );
+    return true;
+  }
+
+  if (!inspectResult.hasFlowSpec) {
+    vscode.window.showErrorMessage(
+      'No FlowSpec class found. This file does not appear to be a Metaflow flow.'
+    );
+    return true;
+  }
+
+  return true;
+}
+
+module.exports = {
+  flowInspectAllowsRun,
+  validateEditorForFlowCommands,
+  reportFlowInspectFailure,
+};
